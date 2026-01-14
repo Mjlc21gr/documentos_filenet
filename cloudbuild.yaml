@@ -24,13 +24,17 @@ steps:
       - '--set-env-vars'
       - 'AWS_API_URL=${_AWS_API_URL},AWS_API_KEY=${_AWS_API_KEY}'
       - '--memory'
-      - '512Mi'
+      - '1Gi'
       - '--cpu'
       - '1'
       - '--max-instances'
       - '10'
       - '--timeout'
       - '300s'
+      - '--port'
+      - '8080'
+      - '--concurrency'
+      - '80'
 
 images:
   - 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA'
@@ -42,3 +46,4 @@ substitutions:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  substitution_option: ALLOW_LOOSE

@@ -56,8 +56,8 @@ async def consultar_documento(request: FileNetRequest):
         El documento (PDF, imagen, etc.) tal como lo devuelve AWS
     """
     try:
-        # Construir la URL completa
-        url = f"{AWS_API_URL}/{request. }"
+        # Construir la URL completa - ERROR CORREGIDO AQUÍ
+        url = f"{AWS_API_URL}/{request.idFilenet}"
         
         # Headers para la petición
         headers = {
@@ -113,4 +113,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8080))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
-
