@@ -1,0 +1,45 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA', '.']
+  
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA']
+  
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'filenet-api'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'AWS_API_URL=${_AWS_API_URL},AWS_API_KEY=${_AWS_API_KEY}'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--timeout'
+      - '60s'
+
+images:
+  - 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA'
+
+# Variables de sustitución (configurar en GCP Cloud Build Triggers)
+substitutions:
+  _AWS_API_URL: 'https://c4huz7dmpc-vpce-0d1e15f4e7cf53d97.execute-api.us-east-1.amazonaws.com/stage/documentos_archivo/api/v1/filenet/documento/soporte'
+  _AWS_API_KEY: 'vvaduJRpkc85IB3MbGNo86IrfD9ssuRHa4UTgV8S'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
