@@ -1,17 +1,11 @@
 steps:
-  # Build the container image usando el registro correcto de Artifact Registry
+  # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: 
-      - 'build'
-      - '-t'
-      - 'northamerica-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/documentos_filenet/documentos-filenet:$COMMIT_SHA'
-      - '.'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA', '.']
   
-  # Push the container image to Artifact Registry
+  # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: 
-      - 'push'
-      - 'northamerica-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/documentos_filenet/documentos-filenet:$COMMIT_SHA'
+    args: ['push', 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA']
   
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -19,32 +13,27 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'documentos-filenet'
+      - 'filenet-api'
       - '--image'
-      - 'northamerica-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/documentos_filenet/documentos-filenet:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA'
       - '--region'
-      - 'northamerica-south1'
+      - 'us-central1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
       - '--set-env-vars'
       - 'AWS_API_URL=${_AWS_API_URL},AWS_API_KEY=${_AWS_API_KEY}'
       - '--memory'
-      - '1Gi'
+      - '512Mi'
       - '--cpu'
-      - '2'
+      - '1'
       - '--max-instances'
       - '10'
-      - '--min-instances'
-      - '0'
       - '--timeout'
-      - '300'
-      - '--port'
-      - '8080'
-      - '--no-cpu-throttling'
+      - '120s'
 
 images:
-  - 'northamerica-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/documentos_filenet/documentos-filenet:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA'
 
 # Variables de sustitución (configurar en GCP Cloud Build Triggers)
 substitutions:
@@ -53,4 +42,3 @@ substitutions:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-
