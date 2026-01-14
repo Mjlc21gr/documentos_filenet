@@ -1,11 +1,17 @@
 steps:
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA', '.']
+    args: 
+      - 'build'
+      - '-t'
+      - 'northamerica-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/documentos_filenet/documentos-filenet:$SHORT_SHA'
+      - '.'
   
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA']
+    args: 
+      - 'push'
+      - 'northamerica-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/documentos_filenet/documentos-filenet:$SHORT_SHA'
   
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -15,27 +21,32 @@ steps:
       - 'deploy'
       - 'documentos-filenet'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA'
+      - 'northamerica-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/documentos_filenet/documentos-filenet:$SHORT_SHA'
       - '--region'
       - 'northamerica-south1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-      - '--set-env-vars'
-      - 'AWS_API_URL=${_AWS_API_URL},AWS_API_KEY=${_AWS_API_KEY}'
+      - '--update-env-vars'
+      - 'AWS_API_URL=${_AWS_API_URL},AWS_API_KEY=${_AWS_API_KEY},PORT=8080'
       - '--memory'
-      - '1Gi'
+      - '2Gi'
       - '--cpu'
       - '2'
       - '--max-instances'
       - '10'
+      - '--min-instances'
+      - '0'
       - '--timeout'
       - '300'
       - '--port'
       - '8080'
+      - '--no-cpu-throttling'
+      - '--execution-environment'
+      - 'gen2'
 
 images:
-  - 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA'
+  - 'northamerica-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/documentos_filenet/documentos-filenet:$SHORT_SHA'
 
 # Variables de sustitución (configurar en GCP Cloud Build Triggers)
 substitutions:
