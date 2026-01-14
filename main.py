@@ -54,10 +54,11 @@ async def stream_from_aws(url: str, headers: dict):
     Stream de datos desde AWS para evitar timeouts
     """
     timeout = httpx.Timeout(
-        connect=30.0,
-        read=120.0,  # Timeout más corto para streaming
-        write=30.0,
-        pool=30.0
+        timeout=120.0,  # Default timeout
+        connect=30.0,   # Connection timeout
+        read=120.0,     # Read timeout  
+        write=30.0,     # Write timeout
+        pool=30.0       # Pool timeout
     )
     
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -102,7 +103,13 @@ async def consultar_documento(request: FileNetRequest):
         logger.info("Iniciando streaming desde AWS...")
         
         # Verificar primero si el documento existe con HEAD request
-        timeout_check = httpx.Timeout(connect=10.0, read=10.0)
+        timeout_check = httpx.Timeout(
+            timeout=30.0,   # Default timeout
+            connect=10.0,   # Connection timeout
+            read=10.0,      # Read timeout
+            write=10.0,     # Write timeout
+            pool=10.0       # Pool timeout
+        )
         async with httpx.AsyncClient(timeout=timeout_check) as client:
             head_response = await client.head(url, headers=headers)
             
@@ -164,7 +171,13 @@ async def test_aws_connection():
     Prueba la conectividad básica con AWS API
     """
     try:
-        timeout = httpx.Timeout(connect=10.0, read=10.0)
+        timeout = httpx.Timeout(
+            timeout=20.0,   # Default timeout
+            connect=10.0,   # Connection timeout
+            read=10.0,      # Read timeout
+            write=10.0,     # Write timeout
+            pool=10.0       # Pool timeout
+        )
         async with httpx.AsyncClient(timeout=timeout) as client:
             # Probar con el documento conocido
             test_url = f"{AWS_API_URL}/{{60584D9B-0000-C217-968B-A1E0D75A061E}}"
