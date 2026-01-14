@@ -57,15 +57,15 @@ async def consultar_documento(request: FileNetRequest):
     """
     try:
         # Construir la URL completa
-        url = f"{AWS_API_URL}/{request.idFilenet}"
+        url = f"{AWS_API_URL}/{request. }"
         
         # Headers para la petición
         headers = {
             "x-api-key": AWS_API_KEY
         }
         
-        # Realizar la petición a AWS
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # Realizar la petición a AWS con timeout extendido
+        async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.get(url, headers=headers)
             
             # Verificar si la petición fue exitosa
