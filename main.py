@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 import os
@@ -49,6 +49,33 @@ async def health_check():
     """
     return {"status": "healthy"}
 
+async def stream_from_aws(url: str, headers: dict):
+    """
+    Stream de datos desde AWS para evitar timeouts
+    """
+    timeout = httpx.Timeout(
+        connect=30.0,
+        read=120.0,  # Timeout más corto para streaming
+        write=30.0,
+        pool=30.0
+    )
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async with client.stream('GET', url, headers=headers) as response:
+            if response.status_code == 200:
+                async for chunk in response.aiter_bytes(chunk_size=8192):  # 8KB chunks
+                    yield chunk
+            elif response.status_code == 404:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Documento no encontrado"
+                )
+            else:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Error en AWS API: {response.status_code}"
+                )
+
 @app.post("/api/v1/filenet/documento")
 async def consultar_documento(request: FileNetRequest):
     """
@@ -72,69 +99,51 @@ async def consultar_documento(request: FileNetRequest):
             "x-api-key": AWS_API_KEY
         }
         
-        # Configurar timeouts más largos
-        timeout = httpx.Timeout(
-            connect=30.0,    # 30 segundos para conectar
-            read=300.0,      # 5 minutos para leer
-            write=30.0,      # 30 segundos para escribir
-            pool=30.0        # 30 segundos para el pool
-        )
+        logger.info("Iniciando streaming desde AWS...")
         
-        logger.info("Realizando petición a AWS...")
-        
-        # Realizar la petición a AWS con timeout extendido
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(url, headers=headers)
+        # Verificar primero si el documento existe con HEAD request
+        timeout_check = httpx.Timeout(connect=10.0, read=10.0)
+        async with httpx.AsyncClient(timeout=timeout_check) as client:
+            head_response = await client.head(url, headers=headers)
             
-            logger.info(f"Respuesta de AWS: {response.status_code}")
-            
-            # Verificar si la petición fue exitosa
-            if response.status_code == 200:
-                # Obtener el Content-Type de la respuesta de AWS
-                content_type = response.headers.get("Content-Type", "application/octet-stream")
-                content_length = len(response.content)
-                
-                logger.info(f"Documento encontrado. Tipo: {content_type}, Tamaño: {content_length} bytes")
-                
-                # Devolver el mismo contenido binario que devuelve AWS
-                return Response(
-                    content=response.content,
-                    media_type=content_type,
-                    headers={
-                        "Content-Disposition": f'attachment; filename="documento_{request.idFilenet}.pdf"',
-                        "Content-Length": str(content_length)
-                    }
-                )
-            elif response.status_code == 404:
+            if head_response.status_code == 404:
                 logger.warning(f"Documento no encontrado: {request.idFilenet}")
                 raise HTTPException(
                     status_code=404,
                     detail=f"Documento con ID {request.idFilenet} no encontrado"
                 )
-            else:
-                logger.error(f"Error en AWS API: {response.status_code} - {response.text}")
+            elif head_response.status_code != 200:
+                logger.error(f"Error en AWS API: {head_response.status_code}")
                 raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"Error al consultar AWS API: {response.text}"
+                    status_code=head_response.status_code,
+                    detail=f"Error al consultar AWS API: {head_response.status_code}"
                 )
-                
+        
+        # Obtener información del archivo
+        content_type = head_response.headers.get("Content-Type", "application/pdf")
+        content_length = head_response.headers.get("Content-Length")
+        
+        response_headers = {
+            "Content-Disposition": f'attachment; filename="documento_{request.idFilenet}.pdf"'
+        }
+        
+        if content_length:
+            response_headers["Content-Length"] = content_length
+        
+        logger.info(f"Iniciando streaming del documento. Tipo: {content_type}")
+        
+        # Usar StreamingResponse para enviar el archivo por chunks
+        return StreamingResponse(
+            stream_from_aws(url, headers),
+            media_type=content_type,
+            headers=response_headers
+        )
+        
     except httpx.TimeoutException as e:
         logger.error(f"Timeout en petición a AWS: {str(e)}")
         raise HTTPException(
             status_code=504,
-            detail=f"Timeout al consultar la API de AWS. El documento puede ser muy grande o la API está lenta."
-        )
-    except httpx.ConnectTimeout:
-        logger.error("Timeout de conexión con AWS")
-        raise HTTPException(
-            status_code=503,
-            detail="Timeout de conexión con AWS API"
-        )
-    except httpx.ReadTimeout:
-        logger.error("Timeout de lectura con AWS")
-        raise HTTPException(
-            status_code=504,
-            detail="Timeout de lectura con AWS API. El documento puede ser muy grande."
+            detail="Timeout al consultar la API de AWS"
         )
     except httpx.RequestError as exc:
         logger.error(f"Error de conexión con AWS: {str(exc)}")
@@ -149,7 +158,6 @@ async def consultar_documento(request: FileNetRequest):
             detail=f"Error interno del servidor: {str(e)}"
         )
 
-# Endpoint para probar la conectividad con AWS (sin documento específico)
 @app.get("/test-aws-connection")
 async def test_aws_connection():
     """
@@ -158,12 +166,14 @@ async def test_aws_connection():
     try:
         timeout = httpx.Timeout(connect=10.0, read=10.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
-            # Solo hacer un HEAD request para probar conectividad
-            response = await client.head(AWS_API_URL.rsplit('/', 1)[0], 
-                                       headers={"x-api-key": AWS_API_KEY})
+            # Probar con el documento conocido
+            test_url = f"{AWS_API_URL}/{{60584D9B-0000-C217-968B-A1E0D75A061E}}"
+            response = await client.head(test_url, headers={"x-api-key": AWS_API_KEY})
             return {
                 "status": "connected",
                 "aws_response_code": response.status_code,
+                "content_type": response.headers.get("Content-Type"),
+                "content_length": response.headers.get("Content-Length"),
                 "message": "Conectividad con AWS OK"
             }
     except Exception as e:

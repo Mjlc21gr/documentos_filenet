@@ -30,7 +30,7 @@ steps:
       - '--max-instances'
       - '10'
       - '--timeout'
-      - '900s'  # Aumentado a 15 minutos
+      - '900s'
       - '--port'
       - '8080'
       - '--concurrency'
@@ -39,7 +39,7 @@ steps:
 images:
   - 'gcr.io/$PROJECT_ID/filenet-api:$COMMIT_SHA'
 
-# Variables de sustitución
+# Variables de sustitución (configurar en GCP Cloud Build Triggers)
 substitutions:
   _AWS_API_URL: 'https://c4huz7dmpc-vpce-0d1e15f4e7cf53d97.execute-api.us-east-1.amazonaws.com/stage/documentos_archivo/api/v1/filenet/documento/soporte'
   _AWS_API_KEY: 'vvaduJRpkc85IB3MbGNo86IrfD9ssuRHa4UTgV8S'
